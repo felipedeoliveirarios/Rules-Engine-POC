@@ -5,7 +5,7 @@ def seed_data(db: Session):
     """Popula o banco com dados iniciais se estiver vazio."""
     
     # Só executa se não houver dados
-    if db.query(Tenant).first():
+    if db.query(Rule).first():
         return
     
     # Tenants
@@ -47,5 +47,21 @@ def seed_data(db: Session):
         AbTest(name="variant_b"),
     ]
     db.add_all(ab_tests)
+    
+    # Regra base (prioridade mais baixa - todos wildcards)
+    base_rule = Rule(
+        weight=0,
+        tenant="*",
+        country="*",
+        platform="*",
+        user_role="*",
+        ab_test="*",
+        monthly_fee="=0",
+        max_discount="=0",
+        cashback="=0",
+        trial_days="=0",
+        points_modifier="=0",
+    )
+    db.add(base_rule)
     
     db.commit()

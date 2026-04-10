@@ -45,7 +45,7 @@ def list_rules(
         user_role=user_role,
         ab_test=ab_test,
     )
-    items = [RuleResponse.from_orm_with_conversion(r) for r in rules]
+    items = [RuleResponse.model_validate(r) for r in rules]
     return PaginatedResponse(items=items, total=total, skip=skip, limit=limit)
 
 @app.get("/rules/match", response_model=ConsolidatedRuleResponse)
@@ -63,14 +63,12 @@ def search_rules(
 @app.post("/rules", response_model=RuleResponse, status_code=201)
 def create_rule(rule: RuleCreate, db: Session = Depends(get_db)):
     """Cria uma nova regra com seletores de contexto e valores numéricos."""
-    created = rule_service.create(db, rule)
-    return RuleResponse.from_orm_with_conversion(created)
+    return rule_service.create(db, rule)
 
 @app.put("/rules/{rule_id}", response_model=RuleResponse)
 def update_rule(rule_id: int, rule: RuleCreate, db: Session = Depends(get_db)):
     """Atualiza uma regra existente."""
-    updated = rule_service.update(db, rule_id, rule)
-    return RuleResponse.from_orm_with_conversion(updated)
+    return rule_service.update(db, rule_id, rule)
 
 @app.delete("/rules/{rule_id}", status_code=204)
 def delete_rule(rule_id: int, db: Session = Depends(get_db)):

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, Index
 from app.database import Base
 
 class Rule(Base):
@@ -17,6 +17,10 @@ class Rule(Base):
     cashback = Column(String(32))
     trial_days = Column(String(32))
     points_modifier = Column(String(32))
+    
+    __table_args__ = (
+        Index('ix_rules_selectors', 'tenant', 'country', 'platform', 'user_role', 'ab_test'),
+    )
 
 class Tenant(Base):
     __tablename__ = "tenants"

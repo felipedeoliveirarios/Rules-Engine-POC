@@ -74,6 +74,7 @@ class RuleConsolidator:
         if rule_value_str.endswith('%'):
             return FieldValue(Decimal(rule_value_str[:-1]) / 100, FieldValueType.PERCENT_MODIFIER)
         
+        # +N ou -N → modificador absoluto
         return FieldValue(Decimal(rule_value_str), FieldValueType.ABSOLUTE_MODIFIER)
 
     def _process_field(self, field_data: FieldData, value_str: str | None) -> None:
