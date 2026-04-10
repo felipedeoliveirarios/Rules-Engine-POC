@@ -1,7 +1,8 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
+from cachetools import TTLCache
 from app.models import Rule, Tenant, Country, Platform, UserRole, AbTest
-from app.schemas import RuleCreate
+from app.schemas import RuleCreate, RuleUpdate
 from app.services.rule_consolidator import rule_consolidator, ConsolidatedRule
 
 SELECTOR_WILDCARD = "*"
@@ -18,6 +19,12 @@ SELECTOR_MODELS = {
     'ab_test': (AbTest, 'name'),
 }
 
+# Cache para resultados do match (5 minutos)
+_match_cache: TTLCache = TTLCache(maxsize=1000, ttl=300)
+
+# Cache para validação de seletores (1 hora)
+_selector_cache: TTLCache = TTLCache(maxsize=500, ttl=3600)
+
 
 class RuleService:
     def _calculate_weight(self, data: RuleCreate) -> int:
@@ -29,11 +36,23 @@ class RuleService:
         return weight
     
     def _validate_selector_value(self, db: Session, selector: str, value: str | None) -> None:
-        """Valida se um seletor existe na tabela de lookup."""
+        """Valida se um seletor existe na tabela de lookup (com cache)."""
         if not value:
             return
+        
+        cache_key = (selector, value)
+        if cache_key in _selector_cache:
+            if not _selector_cache[cache_key]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Valor '{value}' não encontrado para {selector}"
+                )
+            return
+        
         model, field = SELECTOR_MODELS[selector]
-        exists = db.query(model).filter(getattr(model, field) == value).first()
+        exists = db.query(model).filter(getattr(model, field) == value).first() is not None
+        _selector_cache[cache_key] = exists
+        
         if not exists:
             raise HTTPException(
                 status_code=400,
@@ -108,6 +127,11 @@ class RuleService:
         self._validate_selector_value(db, 'user_role', user_role)
         self._validate_selector_value(db, 'ab_test', ab_test)
         
+        # Verifica cache
+        cache_key = (tenant, country, platform, user_role, ab_test)
+        if cache_key in _match_cache:
+            return _match_cache[cache_key]
+        
         query = db.query(Rule)
         
         # Tenant Selector
@@ -143,7 +167,9 @@ class RuleService:
         
         rules_list = query.order_by(Rule.weight.desc()).all()
         
-        return rule_consolidator.consolidate(rules_list)
+        result = rule_consolidator.consolidate(rules_list)
+        _match_cache[cache_key] = result
+        return result
     
     def get(self, db: Session, rule_id: int) -> Rule:
         rule = db.query(Rule).filter(Rule.id == rule_id).first()
@@ -159,25 +185,27 @@ class RuleService:
         db.add(rule)
         db.commit()
         db.refresh(rule)
+        
+        _match_cache.clear()
         return rule
     
-    def update(self, db: Session, rule_id: int, data: RuleCreate) -> Rule:
+    def update(self, db: Session, rule_id: int, data: RuleUpdate) -> Rule:
         rule = self.get(db, rule_id)
         
-        self._validate_selectors(db, data)
-        self._check_duplicate_selectors(db, data, exclude_id=rule_id)
-        
-        for key, value in data.model_dump().items():
+        for key, value in data.model_dump(exclude_unset=True).items():
             setattr(rule, key, value)
-        rule.weight = self._calculate_weight(data)
         db.commit()
         db.refresh(rule)
+        
+        _match_cache.clear()
         return rule
     
     def delete(self, db: Session, rule_id: int) -> None:
         rule = self.get(db, rule_id)
         db.delete(rule)
         db.commit()
+        
+        _match_cache.clear()
 
 
 rule_service = RuleService()

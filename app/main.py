@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database import engine, get_db, Base
 from app.schemas import (
-    RuleCreate, RuleResponse, PaginatedResponse, ConsolidatedRuleResponse,
+    RuleCreate, RuleUpdate, RuleResponse, PaginatedResponse, ConsolidatedRuleResponse,
     TenantCreate, TenantResponse,
     CountryCreate, CountryResponse,
     PlatformCreate, PlatformResponse,
@@ -66,8 +66,8 @@ def create_rule(rule: RuleCreate, db: Session = Depends(get_db)):
     return rule_service.create(db, rule)
 
 @app.put("/rules/{rule_id}", response_model=RuleResponse)
-def update_rule(rule_id: int, rule: RuleCreate, db: Session = Depends(get_db)):
-    """Atualiza uma regra existente."""
+def update_rule(rule_id: int, rule: RuleUpdate, db: Session = Depends(get_db)):
+    """Atualiza os valores de uma regra existente (seletores não podem ser alterados)."""
     return rule_service.update(db, rule_id, rule)
 
 @app.delete("/rules/{rule_id}", status_code=204)

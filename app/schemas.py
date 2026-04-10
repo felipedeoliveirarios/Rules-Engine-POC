@@ -64,6 +64,19 @@ class RuleResponse(BaseModel):
         from_attributes = True
 
 
+class RuleUpdate(BaseModel):
+    monthly_fee: str | None = None
+    max_discount: str | None = None
+    cashback: str | None = None
+    trial_days: str | None = None
+    points_modifier: str | None = None
+    
+    @field_validator('monthly_fee', 'max_discount', 'cashback', 'trial_days', 'points_modifier')
+    @classmethod
+    def valid_rule_value(cls, v: str | None) -> str | None:
+        return validate_rule_value(v)
+
+
 class ConsolidatedRuleResponse(BaseModel):
     monthly_fee: Decimal | None = None
     max_discount: Decimal | None = None
