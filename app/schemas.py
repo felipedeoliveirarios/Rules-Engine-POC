@@ -40,7 +40,6 @@ class PaginatedResponse(BaseModel, Generic[T]):
 
 # Rule
 class RuleCreate(BaseModel):
-    weight: int
     tenant: str
     country: str
     platform: str

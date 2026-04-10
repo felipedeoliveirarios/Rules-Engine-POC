@@ -6,8 +6,20 @@ from app.services.rule_consolidator import rule_consolidator, ConsolidatedRule
 
 SELECTOR_WILDCARD = "*"
 
+# Ordem de prioridade dos seletores (índice = prioridade)
+SELECTOR_PRIORITY = ['tenant', 'country', 'platform', 'user_role', 'ab_test']
+
 
 class RuleService:
+    def _calculate_weight(self, data: RuleCreate) -> int:
+        weight = 0
+        for priority, selector in enumerate(SELECTOR_PRIORITY):
+            value = getattr(data, selector)
+            if value is not None and value != SELECTOR_WILDCARD:
+                weight += 10 ** priority
+        return weight
+    
+    
     def list(
         self, db: Session,
         skip: int = 0,
@@ -87,7 +99,7 @@ class RuleService:
         return rule
     
     def create(self, db: Session, data: RuleCreate) -> Rule:
-        rule = Rule(**data.model_dump())
+        rule = Rule(**data.model_dump(), weight=self._calculate_weight(data))
         db.add(rule)
         db.commit()
         db.refresh(rule)
@@ -97,6 +109,7 @@ class RuleService:
         rule = self.get(db, rule_id)
         for key, value in data.model_dump().items():
             setattr(rule, key, value)
+        rule.weight = self._calculate_weight(data)
         db.commit()
         db.refresh(rule)
         return rule
