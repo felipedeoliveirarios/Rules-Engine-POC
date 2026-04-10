@@ -1,6 +1,26 @@
 # Rules Engine POC
 
-API para gerenciamento de regras de negócio baseadas em contexto (tenant, país, plataforma, nível de usuário, teste A/B).
+## O que é isso?
+
+Esta é uma Prova de Conceito (POC) para um motor de regras de negócio configuráveis baseado em contexto.
+
+## O problema
+
+Aplicações frequentemente precisam variar valores de negócio (preços, limites, descontos, etc.) com base em múltiplos fatores contextuais: qual cliente está acessando, de qual país, em qual plataforma, qual o nível do usuário, se está em um teste A/B.
+
+A abordagem tradicional — hardcoding ou configurações estáticas — não escala bem quando:
+- Há muitas combinações possíveis de contexto
+- Regras precisam ser alteradas sem deploy
+- Diferentes níveis de especificidade precisam coexistir (regra geral vs. regra específica)
+
+## A solução
+
+Um motor de regras que:
+
+1. **Define regras por seletores de contexto** — cada regra especifica para quais combinações de tenant/país/plataforma/usuário/teste ela se aplica
+2. **Calcula prioridade automaticamente** — regras mais específicas têm precedência sobre regras genéricas
+3. **Consolida valores hierarquicamente** — permite definir valores base e modificadores que se acumulam
+4. **Resolve em tempo real** — dado um contexto, retorna os valores consolidados aplicáveis
 
 ## Como rodar
 
@@ -53,8 +73,8 @@ Os campos de valor (`monthly_fee`, `max_discount`, `cashback`, `trial_days`, `po
 | Formato | Tipo | Exemplo | Descrição |
 |---------|------|---------|-----------|
 | `=N` | Absoluto | `=100` | Define o valor base |
-| `N` ou `+N` ou `-N` | Modificador absoluto | `+10`, `-5` | Soma/subtrai do valor |
-| `N%` | Modificador percentual | `15%` | Adiciona N% do valor atual |
+| `+N` ou `-N` | Modificador absoluto | `+10`, `-5` | Soma/subtrai do valor |
+| `+N%` ou `-N%` | Modificador percentual | `-15%` | Adiciona/subtrai N% do valor atual |
 | `xN` | Multiplicador | `x1.5` | Multiplica o valor |
 
 ### Consolidação hierárquica
@@ -68,7 +88,7 @@ O processo para cada campo:
 
 Exemplo com `monthly_fee`:
 ```
-Regra peso 10001: monthly_fee = "-5"      (modificador)
+Regra peso 10001: monthly_fee = "-5"      (modificador absoluto)
 Regra peso 100:   monthly_fee = "x1.2"    (multiplicador)  
 Regra peso 1:     monthly_fee = "=100"    (base)
 
@@ -79,13 +99,13 @@ Resultado: ((100 - 5) * 1.2) = 114
 
 ```
 ├── app/
-│   ├── main.py                  # Endpoints da API
+│   ├── main.py                  # Endpoints da API + middleware de logging
 │   ├── models.py                # Modelos SQLAlchemy
 │   ├── schemas.py               # Schemas Pydantic (com validação)
 │   ├── database.py              # Conexão com banco
 │   ├── seed.py                  # Dados iniciais
 │   └── services/
-│       ├── rule_service.py      # CRUD e busca de regras
+│       ├── rule_service.py      # CRUD, busca e cache de regras
 │       ├── rule_consolidator.py # Consolidação hierárquica
 │       └── lookup_service.py    # CRUD das entidades de contexto
 ├── Dockerfile
@@ -102,7 +122,7 @@ Resultado: ((100 - 5) * 1.2) = 114
 | GET | `/rules` | Lista regras (paginado, com filtros) |
 | GET | `/rules/match` | Retorna regra consolidada por contexto |
 | POST | `/rules` | Cria regra |
-| PUT | `/rules/{id}` | Atualiza regra |
+| PUT | `/rules/{id}` | Atualiza valores da regra |
 | DELETE | `/rules/{id}` | Remove regra |
 
 ### Entidades de contexto
@@ -114,3 +134,10 @@ Tenants, Countries, Platforms, User Roles, A/B Tests — endpoints para gerencia
 | GET | `/{entidade}` | Lista todos |
 | POST | `/{entidade}` | Cria |
 | DELETE | `/{entidade}/{id}` | Remove |
+
+## Limitações da POC
+
+- Cache em memória (não persiste entre restarts, não funciona com múltiplas instâncias)
+- SQLite como banco (não recomendado para produção)
+- Sem autenticação/autorização
+- Sem versionamento de regras ou histórico de alterações
