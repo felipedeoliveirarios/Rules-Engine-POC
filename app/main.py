@@ -1,5 +1,7 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from sqlalchemy.orm import Session
+import time
+import logging
 
 from app.database import engine, get_db, Base
 from app.schemas import (
@@ -15,7 +17,19 @@ from app.services import (
     platform_service, user_role_service, ab_test_service,
 )
 
+logger = logging.getLogger("uvicorn.access")
+
 app = FastAPI(title="Rules Engine POC")
+
+
+@app.middleware("http")
+async def log_request_time(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = (time.perf_counter() - start) * 1000
+    logger.info(f"{request.method} {request.url.path} - {duration_ms:.2f}ms")
+    return response
+
 
 @app.on_event("startup")
 def startup():
