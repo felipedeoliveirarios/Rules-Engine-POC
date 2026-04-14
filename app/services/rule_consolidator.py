@@ -72,7 +72,7 @@ class RuleConsolidator:
             return FieldValue(Decimal(rule_value_str[1:]), FieldValueType.MULTIPLIER_MODIFIER)
         
         if rule_value_str.endswith('%'):
-            return FieldValue(Decimal(rule_value_str[:-1]) / 100, FieldValueType.PERCENT_MODIFIER)
+            return FieldValue(Decimal(rule_value_str[:-1]), FieldValueType.PERCENT_MODIFIER)
         
         # +N ou -N → modificador absoluto
         return FieldValue(Decimal(rule_value_str), FieldValueType.ABSOLUTE_MODIFIER)
@@ -109,7 +109,7 @@ class RuleConsolidator:
             return None
             
         absolute_modifier = Decimal(0)
-        percent_modifier = Decimal(0)
+        percent_modifier = Decimal(100)
         multiplier_modifier: Decimal | None = None
         
         for modifier in field_data.modifiers:
@@ -129,7 +129,7 @@ class RuleConsolidator:
         if multiplier_modifier is not None:
             final_value *= multiplier_modifier
             
-        final_value += final_value * percent_modifier
+        final_value *= percent_modifier / 100
         
         return final_value
 
